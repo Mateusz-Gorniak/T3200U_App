@@ -32,10 +32,10 @@ int main()
 	DWORD LocId;
 	PVOID SerialNumber[16];
 	PVOID Description[64];
-	DWORD BytesWritten;// needed to calibration
-	DWORD BytesReceived;// needed to calibration
-	DWORD TxBytes;
-	DWORD RxBytes = 8;
+	DWORD BytesWritten=0;// needed to calibration
+	DWORD BytesReceived=0;// needed to calibration
+	DWORD TxBytes=0;
+	DWORD RxBytes = 4;
 	DWORD EventDWord;
 
 	//Registers data below: 

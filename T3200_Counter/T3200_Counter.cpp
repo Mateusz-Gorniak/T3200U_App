@@ -5,20 +5,7 @@
 #include <stdio.h>
 #include <string>
 
-
 typedef unsigned long  uint32;
-
-uint32 deserialize_uint32(char* buffer)
-{
-	uint32 value = 0;
-
-	value |= buffer[0] << 24;
-	value |= buffer[1] << 16;
-	value |= buffer[2] << 8;
-	value |= buffer[3];
-	return value;
-
-}
 
 int main()
 {
@@ -32,10 +19,10 @@ int main()
 	DWORD LocId;
 	PVOID SerialNumber[16];
 	PVOID Description[64];
-	DWORD BytesWritten=0;// needed to calibration
+	DWORD BytesWritten=5;// needed to calibration
 	DWORD BytesReceived=0;// needed to calibration
-	DWORD TxBytes=0;
-	DWORD RxBytes = 4;
+	DWORD TxBytes;
+	DWORD RxBytes;
 	DWORD EventDWord;
 
 	//Registers data below: 
@@ -49,15 +36,14 @@ int main()
 
 	byte cmd_meas [] = { 0x01, 0x01, 0x00, 0x00, 0x00 };//Start of measurement
 	byte cmd_rd_meas_no [] = { 0xF1, 0x01, 0x00, 0x00, 0x00 };//Read current number of executed measurements 
-	byte cmd_rd_f_data [] = { 0xF0, 0x00, 0x00, 0x00, 0x00 };//Read data
+	byte cmd_rd_f_data [] = { 0xF0, 0x02, 0x00, 0x00, 0x00 };//Read data
 	
-	
+
 	//Additional variables
 	bool calibrated = false;
-	uint32_t numBytesRead = 0;
 	char RxBuffer[4 * 1024];
-	uint32_t dataR = 0;
-	uint32_t data = 0;
+	uint32 dataR = 0;
+	uint32 data = 0;
 
 
 	//Code below:
@@ -65,13 +51,13 @@ int main()
 	printf("Created by Mateusz Gorniak and Pawel Slapaczynski\n");
 	printf("WYDZIAL ELEKTRONIKI WAT\n\n");
 	printf("------------------------------------------------------------------------------\n");
-	Sleep(1000);
+	Sleep(1500);
 	ftStatus = FT_CreateDeviceInfoList(&numDevs);
 	if (ftStatus == FT_OK) {
 		printf("Number of devices is %d\n", numDevs);
 	}
 	printf("------------------------------------------------------------------------------\n");
-	Sleep(1000);
+	Sleep(1500);
 	ftStatus = FT_GetDeviceInfoDetail(0, &Flags, &Type, &ID, &LocId, SerialNumber, Description, &ftHandle);
 	if (ftStatus == FT_OK) {
 		printf("Infos about connected devices\n");
@@ -94,7 +80,7 @@ int main()
 		Sleep(200);
 		printf("------------------------------------------------------------------------------\n");
 	}
-	Sleep(1000);
+	Sleep(1500);
 
 	ftStatus = FT_OpenEx((PVOID)"FTVW9H5E", FT_OPEN_BY_SERIAL_NUMBER, &ftHandle);
 	if (ftStatus == FT_OK) {
@@ -110,7 +96,7 @@ int main()
 
 	if (ftStatus != FT_OK) printf("ftStatus not ok %d\n", ftStatus); //check for error
 	else
-	{ /*
+	{ 
 		printf("Reseting Device ....\n\n");
 		ftStatus = FT_ResetDevice(ftHandle);
 		if (ftStatus == FT_OK) {
@@ -122,14 +108,9 @@ int main()
 			printf("FT_ResetDevice failed\n");
 		}
 		printf("------------------------------------------------------------------------------\n");
-		Sleep(1000);
-		*/
-
-		FT_Write(ftHandle, cmd_ctrl, sizeof(cmd_ctrl), &BytesWritten);
-		FT_Write(ftHandle, cmd_en, sizeof(cmd_en), &BytesWritten);
-	    FT_Write(ftHandle, cmd_wr_s, sizeof(cmd_wr_s), &BytesWritten);
-		FT_Write(ftHandle, cmd_wr_dac, sizeof(cmd_wr_dac), &BytesWritten);
-
+		Sleep(1500);
+		
+	
 		printf("Wait on calibration\n");
 		ftStatus = FT_Write(ftHandle, cmd_res, 5, &BytesWritten);
 		if (ftStatus == FT_OK) {
@@ -142,17 +123,17 @@ int main()
 		}
 		
 		Sleep(5000);
-		
+
 		do
 		{
-			ftStatus = FT_Write(ftHandle, cmd_rd_f_data, sizeof(cmd_rd_f_data), &BytesWritten);
+			ftStatus = FT_Write(ftHandle, cmd_rd_s, sizeof(cmd_rd_s), &BytesWritten);
 			FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
 			if (RxBytes > 0) {
 				ftStatus = FT_Read(ftHandle, RxBuffer, RxBytes, &BytesReceived);
 				if (ftStatus == FT_OK) {
 					// FT_Read OK
 					//data =(byte)RxBuffer;
-					data = deserialize_uint32(RxBuffer);
+					std::memcpy(&data, RxBuffer, sizeof(uint32));
 					std::cout << data;
 					//std::cout << data << std::endl;
 					//std::cout << dataR << std::endl;
@@ -164,55 +145,13 @@ int main()
 					printf("Read Failed");
 				}
 			}
-			if ((data & 2048) == 2048) {calibrated = true; }
+			if ((data & 2048) == 2048) { calibrated = true; }
 		} while (!calibrated);
 		
 		printf("\n\n");
 		printf("Calibration done\n");
 		printf("------------------------------------------------------------------------------\n");
-
-		double Offset = 0.000000000000000; // declaration variable with big precission 
-		//double Meas = 0.000000000000000;
-		UINT64 Count = 0;
-		uint32 A = 0;
-		uint32 B = 0;
-
-		cmd_rd_f_data[1] = 0x02;
-		FT_Write(ftHandle, cmd_rd_f_data, 5, &BytesWritten);
-		
-		FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-		do{
-			FT_GetStatus(ftHandle, &RxBytes, &TxBytes, &EventDWord);
-			std::cout << RxBytes;
-		} while (RxBytes < 8);
-		printf("\n");
-
-		ftStatus = FT_Read(ftHandle, RxBuffer, 8, &BytesReceived);
-		if (ftStatus == FT_OK) {
-			// FT_Read OK
-			std::cout << "RxBuffer = " << RxBuffer << "\n";
-			data = deserialize_uint32(RxBuffer);
-			std::cout << "DATA = " << data << "\n";
-		}
-		else {
-			// FT_Read Failed
-			printf("Read Failed");
-		}
-		//Count = data >> 20;
-
-		A = data & 0x3FF;
-		std::cout << "A = " << A<< "\n";
-		B = (data >> 10) & 0x3FF;
-		std::cout << "B = " << B << "\n";
-		Count = 0;
-		//Count = (data << 12) | Count;
-
-		std::cout  << "Count = " << Count << "\n";
-
-		Offset = 4 * ((double)Count + (((double)A - (double)B) / 1024));
-		std::cout<<"Offset = "<<Offset<< " ns\n";
-		
-
+	
 	}
 	ftStatus = FT_Close(ftHandle);
 	printf("Press Key To End Program\n");
